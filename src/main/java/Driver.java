@@ -8,6 +8,7 @@ public class Driver {
     public static WebDriver getWebDriver() {
         if (webDriver == null) {
             webDriver = new ChromeDriver();
+            webDriver.manage().window().fullscreen();
         }
         return webDriver;
     }

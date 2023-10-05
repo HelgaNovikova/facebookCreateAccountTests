@@ -1,17 +1,23 @@
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openqa.selenium.*;
 import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.Select;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.opentest4j.AssertionFailedError;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -31,32 +37,31 @@ public class CreateAccountTests {
     private final String retypeEmailXpath = "//input[@name='reg_email_confirmation__']";
     private final String passwordXpath = "//input[@id='password_step_input']";
     private final String submitButtonXpath = "//button[text()='Sign Up']";
-    private final String customGenderXpath = "//label[text()='Custom']";
+    private final String customGenderXpath = "//*[text()='Custom']//following-sibling::*[@type='radio']";
     private final String preferredPronounXpath = "//select[@name='preferred_pronoun']";
     private final String customGenderManualInputXpath = "//input[@name='custom_gender']";
-    private final String closePopupXpath = "//img[@class='_8idr img']";
     private final String birthdayMonthXpath = "//select[@name='birthday_month']";
     private final String birthdayDayXpath = "//select[@name='birthday_day']";
     private final String birthdayYearXpath = "//select[@name='birthday_year']";
-    private final String femaleGenderXpath = "//label[text()='Female']";
-    private final String maleGenderXpath = "//label[text()='Male']";
+    private final String femaleGenderXpath = "//*[text()='Female']//following-sibling::*[@type='radio']";
+    private final String maleGenderXpath = "//*[text()='Male']//following-sibling::*[@type='radio']";
 
     @BeforeAll
     public static void openPage() {
         wd = Driver.getWebDriver();
-        wd.get(URL);
         wd.manage().timeouts().implicitlyWait(Duration.ofMillis(5000));
         logger.info("Started - Autotests for facebook create account");
     }
 
     @AfterAll
-    public static void closePage(){
-        wd.quit();
+    public static void closePage() {
+        Driver.quitDriver();
     }
 
     @BeforeEach
     public void openCreateAccountPopup() {
         try {
+            wd.get(URL);
             WebElement createAccountButton = wd.findElement(By.xpath(createAccountXpath));
             assertNotNull(createAccountButton, "Create account button was not found");
             WebDriverWait wait = new WebDriverWait(wd, Duration.ofSeconds(5));
@@ -64,19 +69,6 @@ public class CreateAccountTests {
             createAccountButton.click();
         } catch (AssertionFailedError e) {
             logger.error("Assertion failed - Create account button was not found");
-            throw e;
-        }
-    }
-
-    @AfterEach
-    public void closeSignUpPopup() {
-        try {
-            WebElement closeSignUpPopup = wd.findElement(By.xpath(closePopupXpath));
-            closeSignUpPopup.click();
-            WebElement createAccountButton = wd.findElement(By.xpath(createAccountXpath));
-            assertNotNull(createAccountButton, "Create account button was not found");
-        } catch (AssertionFailedError | NoSuchElementException e) {
-            logger.error("Assertion failed - Create Account popup was not closed or Create Account button didn't appear");
             throw e;
         }
     }
@@ -220,6 +212,75 @@ public class CreateAccountTests {
             logger.error("Assertion of email and retype email fields failed: " + e.getMessage());
             throw e;
         }
+    }
+
+    @Test
+    public void fillFieldsErrorMessages() {
+        submitButtonClick();
+        wd.findElement(By.xpath(firstNameXpath)).click();
+        assertNotNull(wd.findElement(By.xpath("//*[contains(text(),'your name')]")));
+        wd.findElement(By.xpath(lastNameXpath)).click();
+        assertNotNull(wd.findElement(By.xpath("//*[contains(text(), 'your name')]")));
+        wd.findElement(By.xpath(mobileOrEmailXpath)).click();
+        assertNotNull(wd.findElement(By.xpath("//*[contains(text(), 'to reset your password')]")));
+        wd.findElement(By.xpath(passwordXpath)).click();
+        assertNotNull(wd.findElement(By.xpath("//*[contains(text(), 'at least six numbers')]")));
+        wd.findElement(By.xpath(birthdayDayXpath)).click();
+        assertNotNull(wd.findElement(By.xpath("//*[contains(text(), 'real birthday')]")));
+        wd.findElement(By.xpath(birthdayMonthXpath)).click();
+        assertNotNull(wd.findElement(By.xpath("//*[contains(text(), 'real birthday')]")));
+        wd.findElement(By.xpath(birthdayYearXpath)).click();
+        assertNotNull(wd.findElement(By.xpath("//*[contains(text(), 'real birthday')]")));
+        wd.findElement(By.xpath("//span[@data-name='gender_wrapper']/../i[1]")).click();
+        assertNotNull(wd.findElement(By.xpath("//*[contains(text(), 'choose a gender')]")));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"1990", "2023", "1905"})
+    public void yearTest(String year) {
+        wd.findElement(By.xpath(birthdayYearXpath)).click();
+        wd.findElement(By.xpath("//*[text() = '" + year + "']")).click();
+        String yearValue = wd.findElement(By.xpath(birthdayYearXpath)).getAttribute("value");
+        assertEquals(year, yearValue);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"Oct", "Jan", "Dec"})
+    public void monthTest(String month) {
+        Select select = new Select(wd.findElement(By.xpath(birthdayMonthXpath)));
+        select.selectByVisibleText(month);
+        List<WebElement> selectedOptions = select.getAllSelectedOptions();
+        assertEquals(month, selectedOptions.get(0).getText());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {femaleGenderXpath, maleGenderXpath, customGenderXpath})
+    public void genderTest(String xpath) {
+        WebElement we = wd.findElement(By.xpath(xpath));
+        we.click();
+        String isChecked = we.getAttribute("checked");
+        assertNotNull(isChecked);
+        assertEquals(isChecked, "true");
+    }
+
+    @ParameterizedTest
+    @MethodSource("newPageOpen")
+    public void termsWindowIsOpened(String xpath, String expectedUrlPart) {
+        wd.findElement(By.xpath(xpath)).click();
+        ArrayList<String> tabs = new ArrayList<>(wd.getWindowHandles());
+        wd.switchTo().window(tabs.get(1));
+        String url = wd.getCurrentUrl();
+        assertTrue(url.contains(expectedUrlPart));
+        wd.close();
+        wd.switchTo().window(tabs.get(0));
+    }
+
+    private static Stream<Arguments> newPageOpen() {
+        return Stream.of(
+                Arguments.of("//a[@id='terms-link']", "terms"),
+                Arguments.of("//a[@id='privacy-link']", "privacy"),
+                Arguments.of("//a[@id='cookie-use-link']", "cookies")
+        );
     }
 
     private static Stream<Arguments> invalidEmail() {
